@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jonipwi/go-chat-client/state"
+	"../state"
 	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
 

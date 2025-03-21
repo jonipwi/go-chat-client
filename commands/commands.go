@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jonipwi/go-chat-client/state"
+	"../state"
 )
 
 // ProcessCommand handles all user input commands

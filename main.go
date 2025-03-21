@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jonipwi/go-chat-client/commands"
-	"github.com/jonipwi/go-chat-client/state"
-	"github.com/jonipwi/go-chat-client/utils"
+	"./commands"
+	"./state"
+	"./utils"
 )
 
 func main() {
