@@ -72,7 +72,7 @@ func handleUsernameChange(clientState *state.ClientState, parts []string) {
 	utils.Logger.Printf("COMMAND: Changing username to: %s", newName)
 
 	clientState.Client().Emit("set_username", []interface{}{newName})
-	clientState.username = newName
+	clientState.SetUsername(newName) // Use SetUsername instead of direct field access
 	clientState.TrackMessageSent()
 	utils.Logger.Printf("USERNAME CHANGE REQUEST SENT: new_name=%s", newName)
 }
@@ -83,15 +83,16 @@ func handleDebug(clientState *state.ClientState) {
 
 	fmt.Println("\n==== Debug Information ====")
 	fmt.Printf("Connection State: %v\n", clientState.IsConnected())
-	fmt.Printf("Client ID: %s\n", clientState.clientID)
-	fmt.Printf("Last Activity: %s\n", clientState.lastActivity.Format(time.RFC3339))
+	fmt.Printf("Client ID: %s\n", clientState.GetClientID())                              // Use GetClientID
+	fmt.Printf("Last Activity: %s\n", clientState.GetLastActivity().Format(time.RFC3339)) // Use GetLastActivity
 
 	// Print connection errors
 	fmt.Println("\nConnection Error History:")
-	if len(clientState.connectionErrors) == 0 {
+	connectionErrors := clientState.GetConnectionErrors() // Use GetConnectionErrors
+	if len(connectionErrors) == 0 {
 		fmt.Println("No connection errors recorded")
 	} else {
-		for i, err := range clientState.connectionErrors {
+		for i, err := range connectionErrors {
 			fmt.Printf("%d. %s\n", i+1, err)
 		}
 	}
@@ -99,7 +100,7 @@ func handleDebug(clientState *state.ClientState) {
 	// Print socket information
 	if clientState.Client() != nil {
 		fmt.Println("\nSocket Information:")
-		fmt.Printf("Socket ID: %s\n", clientState.Client().Id())
+		fmt.Printf("Socket ID: %s\n", clientState.GetClientID()) // Use GetClientID
 	} else {
 		fmt.Println("\nSocket Information: No active socket client")
 	}
@@ -115,15 +116,15 @@ func handleForceReconnect(clientState *state.ClientState, host string, port int)
 		utils.Logger.Println("FORCED RECONNECT: Disconnecting current connection")
 		clientState.SetConnected(false)
 		if clientState.Client() != nil {
-			clientState.Client().Close()
+			clientState.Client().Disconnect() // Use Disconnect instead of Close
 		}
 	}
 
 	utils.Logger.Println("FORCED RECONNECT: Initiating new connection")
-	clientState.lastReconnectAttempt = time.Now()
+	clientState.SetLastReconnectAttempt(time.Now()) // Use SetLastReconnectAttempt
 
-	// You'll need to import the function from the main package
-	newClient, err := connectToServer(host, port, clientState)
+	// Use the ConnectToServer function from the state package
+	newClient, err := state.ConnectToServer(host, port, clientState)
 	if err != nil {
 		utils.Logger.Printf("FORCED RECONNECT ERROR: %v", err)
 		clientState.AddConnectionError(fmt.Sprintf("Forced reconnect failed: %v", err))
@@ -131,7 +132,7 @@ func handleForceReconnect(clientState *state.ClientState, host string, port int)
 		return
 	}
 
-	clientState.client = newClient
+	clientState.SetClient(newClient) // Use SetClient
 	utils.Logger.Println("FORCED RECONNECT: New client created, waiting for connection events")
 
 	// Wait a bit to see if connection is established
@@ -153,10 +154,11 @@ func handleConnectionErrors(clientState *state.ClientState) {
 	utils.Logger.Println("COMMAND: Displaying connection error history")
 
 	fmt.Println("\n==== Connection Error History ====")
-	if len(clientState.connectionErrors) == 0 {
+	connectionErrors := clientState.GetConnectionErrors() // Use GetConnectionErrors
+	if len(connectionErrors) == 0 {
 		fmt.Println("No connection errors recorded")
 	} else {
-		for i, err := range clientState.connectionErrors {
+		for i, err := range connectionErrors {
 			fmt.Printf("%d. %s\n", i+1, err)
 		}
 	}

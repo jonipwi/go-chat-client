@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -84,6 +85,20 @@ func (s *ClientState) UpdateActivity() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.lastActivity = time.Now()
+}
+
+// GetLastActivity returns the last activity timestamp
+func (s *ClientState) GetLastActivity() time.Time {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.lastActivity
+}
+
+// SetLastReconnectAttempt updates the last reconnect attempt timestamp
+func (s *ClientState) SetLastReconnectAttempt(t time.Time) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.lastReconnectAttempt = t
 }
 
 // AddConnectionError adds a new connection error to the history
@@ -242,4 +257,24 @@ func (s *ClientState) SetCurrentRoom(room string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.CurrentRoom = room
+}
+
+// ConnectToServer connects to the Socket.IO server
+func ConnectToServer(host string, port int, clientState *ClientState) (*socketio_client.Client, error) {
+	serverURL := fmt.Sprintf("http://%s:%d/socket.io/", host, port)
+	log.Printf("CONNECTION: Connecting to server at %s", serverURL)
+
+	opts := &socketio_client.Options{
+		Transport: "websocket",
+		Query:     make(map[string]string),
+	}
+	opts.Query["username"] = clientState.GetUsername()
+
+	c, err := socketio_client.NewClient(serverURL, opts)
+	if err != nil {
+		log.Printf("CONNECTION ERROR: Failed to create new client: %v", err)
+		return nil, fmt.Errorf("error creating client: %w", err)
+	}
+
+	return c, nil
 }

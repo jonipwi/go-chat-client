@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"../state"
-	"../utils"
+	"github.com/jonipwi/go-chat-client/state"
+	"github.com/jonipwi/go-chat-client/utils"
 )
 
 // handleGlobalMessage sends a message to the global chat

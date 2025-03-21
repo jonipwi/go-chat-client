@@ -3,7 +3,7 @@ package commands
 import (
 	"testing"
 
-	"../state"
+	"github.com/jonipwi/go-chat-client/state"
 )
 
 func TestHandlePing(t *testing.T) {

@@ -5,8 +5,9 @@ import (
 	"log"
 	"time"
 
-	"./events"
-	"./state"
+	"github.com/jonipwi/go-chat-client/events"
+	"github.com/jonipwi/go-chat-client/state"
+
 	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
 
