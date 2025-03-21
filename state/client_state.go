@@ -11,7 +11,7 @@ import (
 // ClientState keeps track of the client state
 type ClientState struct {
 	connected             bool
-	client                *socketio.Client
+	client                *socketio.Client // Use fully qualified type
 	username              string
 	clientID              string
 	mutex                 sync.Mutex
