@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/jonipwi/go-chat-client/socketio_client"
+	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
 
 // ClientState keeps track of the client state
@@ -36,8 +36,6 @@ func NewClientState(username string) *ClientState {
 		connectionErrors: make([]string, 0, 10),
 	}
 }
-
-// Getters and Setters
 
 // IsConnected returns the current connection status
 func (cs *ClientState) IsConnected() bool {
@@ -133,8 +131,6 @@ func (cs *ClientState) GetStats() string {
 		timeSinceLastHeartbeatSent, timeSinceLastHeartbeatReceived, reconnInfo)
 }
 
-// Message and Heartbeat Tracking Methods
-
 // TrackMessageSent increments the messages sent counter
 func (cs *ClientState) TrackMessageSent() {
 	cs.messagesSent++
@@ -160,8 +156,6 @@ func (cs *ClientState) TrackHeartbeatReceived() {
 	cs.lastHeartbeatReceived = time.Now()
 	cs.lastActivity = cs.lastHeartbeatReceived
 }
-
-// Additional Utility Methods
 
 // GetUsername returns the current username
 func (cs *ClientState) GetUsername() string {
@@ -198,32 +192,31 @@ func (cs *ClientState) SetCurrentRoom(room string) {
 	cs.currentRoom = room
 }
 
-// RegisterEventHandlers registers event handlers for the client
-func (cs *ClientState) RegisterEventHandlers() {
-	// Register a handler for the "ping" event
-	cs.client.RegisterHandler("ping", func(client *socketio_client.Client, message interface{}) {
-		log.Println("Received ping message:", message)
-	})
-
-	// Register a handler for the "heartbeat" event
-	cs.client.RegisterHandler("heartbeat", func(client *socketio_client.Client, message interface{}) {
-		log.Println("Received heartbeat message:", message)
-	})
-}
-
 // ConnectToServer establishes a connection to the WebSocket server
 func (cs *ClientState) ConnectToServer(serverURL string) error {
-	client, err := socketio_client.NewClient(serverURL, nil)
+	opts := &socketio_client.Options{
+		Transport: "websocket",
+		Query:     make(map[string]string),
+	}
+	opts.Query["username"] = cs.username
+
+	client, err := socketio_client.NewClient(serverURL, opts)
 	if err != nil {
 		return err
 	}
 
 	cs.client = client
-
-	// Register event handlers after connecting
-	cs.RegisterEventHandlers()
-
-	// Do other client initialization here...
+	cs.connected = true
 
 	return nil
+}
+
+// CloseConnection closes the client connection and updates the state
+func (cs *ClientState) CloseConnection() {
+	if cs.client != nil {
+		cs.client.Emit("disconnect", []interface{}{})
+		cs.client = nil
+		cs.connected = false
+		cs.lastActivity = time.Now()
+	}
 }

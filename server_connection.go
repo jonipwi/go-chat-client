@@ -23,15 +23,29 @@ func connectToServer(host string, port int, clientState *state.ClientState) (*so
 	}
 	opts.Query["username"] = clientState.GetUsername()
 
-	// Create client
-	c, err := socketio_client.NewClient(serverURL, opts)
+	// Create client with retry
+	var c *socketio_client.Client
+	var err error
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		c, err = socketio_client.NewClient(serverURL, opts)
+		if err == nil {
+			break
+		}
+		log.Printf("CONNECTION ERROR: Attempt %d/%d failed: %v", i+1, maxRetries, err)
+		if i < maxRetries-1 {
+			time.Sleep(time.Second * 2)
+		}
+	}
+
 	if err != nil {
-		log.Printf("CONNECTION ERROR: Failed to create new client: %v", err)
+		log.Printf("CONNECTION ERROR: Failed to create client after %d attempts: %v", maxRetries, err)
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
 	// Set up event handlers
 	events.SetupEventHandlers(c, clientState)
+	clientState.SetConnected(true)
 
 	log.Println("CONNECTION: Client connected and all event handlers set up successfully")
 	return c, nil
@@ -46,15 +60,26 @@ func startHeartbeat(clientState *state.ClientState) {
 	for {
 		<-ticker.C
 		if clientState.IsConnected() && clientState.Client() != nil {
-			// Get last heartbeat timestamp
-			timeSinceLastHeartbeat := time.Since(time.Now()) // This will be 0, just for initialization
+			// Calculate time since last heartbeat received
+			lastHeartbeat := clientState.GetLastActivity()
+			timeSinceLastHeartbeat := time.Since(lastHeartbeat)
 
 			log.Printf("HEARTBEAT: Sending heartbeat... (Time since last server response: %v)",
 				timeSinceLastHeartbeat.Round(time.Second))
 
-			clientState.Client().Emit("client_heartbeat", []interface{}{
-				fmt.Sprintf("Heartbeat at %s", time.Now().Format(time.RFC3339)),
+			// Send heartbeat with error handling
+			err := clientState.Client().Emit("client_heartbeat", []interface{}{
+				fmt.Sprintf("Heartbeat from %s at %s",
+					clientState.GetClientID(),
+					time.Now().Format(time.RFC3339)),
 			})
+
+			if err != nil {
+				log.Printf("HEARTBEAT ERROR: Failed to send heartbeat: %v", err)
+				clientState.AddConnectionError(fmt.Sprintf("Heartbeat send failed: %v", err))
+				continue
+			}
+
 			clientState.TrackHeartbeatSent()
 
 			// Warning if we haven't received a heartbeat in a while
@@ -78,7 +103,9 @@ func reportStats(clientState *state.ClientState) {
 
 	for {
 		<-ticker.C
-		stats := clientState.GetStats()
-		log.Printf("CLIENT STATS: %s", stats)
+		if clientState.IsConnected() {
+			stats := clientState.GetStats()
+			log.Printf("CLIENT STATS: %s", stats)
+		}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jonipwi/go-chat-client/state"
+	"github.com/jonipwi/go-chat-client/utils"
 
 	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
@@ -36,64 +37,85 @@ type Room struct {
 
 // SetupEventHandlers configures event listeners for the Socket.IO client
 func SetupEventHandlers(client *socketio_client.Client, clientState *state.ClientState) {
-	client.On("error", func() {
-		fmt.Println("Error occurred")
+	client.On("error", func(args ...interface{}) {
+		errMsg := "Unknown error"
+		if len(args) > 0 {
+			if err, ok := args[0].(error); ok {
+				errMsg = err.Error()
+			} else if str, ok := args[0].(string); ok {
+				errMsg = str
+			}
+		}
+		utils.Logger.Printf("ERROR: Socket.IO error: %s", errMsg)
+		clientState.AddConnectionError(fmt.Sprintf("Socket.IO error: %s", errMsg))
 	})
 
 	client.On("connect", func(args ...interface{}) {
-		fmt.Println("Connected to server")
+		utils.Logger.Println("EVENT: Connected to server")
+		clientState.SetConnected(true)
 		if len(args) > 0 {
 			if id, ok := args[0].(string); ok {
 				clientState.SetClientID(id)
+				utils.Logger.Printf("EVENT: Received client ID: %s", id)
 			}
 		}
 	})
 
 	client.On("disconnect", func() {
-		fmt.Println("Disconnected from server")
+		utils.Logger.Println("EVENT: Disconnected from server")
+		clientState.SetConnected(false)
+		clientState.SetCurrentRoom("")
 	})
 
 	client.On("message", func(msg string) {
-		fmt.Printf("Received message: %s\n", msg)
+		utils.Logger.Printf("EVENT: Received message: %s", msg)
+		clientState.TrackMessageReceived()
 	})
 
 	client.On("chat message", func(msg string) {
-		fmt.Printf("Received chat message: %s\n", msg)
+		utils.Logger.Printf("EVENT: Received chat message: %s", msg)
+		clientState.TrackMessageReceived()
 	})
 
 	client.On("user joined", func(username string) {
-		fmt.Printf("User joined: %s\n", username)
+		utils.Logger.Printf("EVENT: User joined: %s", username)
 	})
 
 	client.On("user left", func(username string) {
-		fmt.Printf("User left: %s\n", username)
+		utils.Logger.Printf("EVENT: User left: %s", username)
 	})
 
 	client.On("typing", func(username string) {
-		fmt.Printf("User %s is typing...\n", username)
+		utils.Logger.Printf("EVENT: User %s is typing...", username)
 	})
 
 	client.On("stop typing", func(username string) {
-		fmt.Printf("User %s stopped typing\n", username)
+		utils.Logger.Printf("EVENT: User %s stopped typing", username)
 	})
 
 	client.On("user list", func(users []string) {
-		fmt.Printf("Current users: %v\n", users)
+		utils.Logger.Printf("EVENT: Current users: %v", users)
 	})
 
 	client.On("private message", func(from string, msg string) {
-		fmt.Printf("Private message from %s: %s\n", from, msg)
+		utils.Logger.Printf("EVENT: Private message from %s: %s", from, msg)
+		clientState.TrackMessageReceived()
 	})
 
 	client.On("room joined", func(room string) {
-		fmt.Printf("Joined room: %s\n", room)
+		utils.Logger.Printf("EVENT: Joined room: %s", room)
 		clientState.SetCurrentRoom(room)
 	})
 
 	client.On("room left", func(room string) {
-		fmt.Printf("Left room: %s\n", room)
+		utils.Logger.Printf("EVENT: Left room: %s", room)
 		if clientState.GetCurrentRoom() == room {
 			clientState.SetCurrentRoom("")
 		}
+	})
+
+	client.On("heartbeat", func(args ...interface{}) {
+		utils.Logger.Println("EVENT: Received server heartbeat")
+		clientState.TrackHeartbeatReceived()
 	})
 }

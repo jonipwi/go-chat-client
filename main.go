@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/jonipwi/go-chat-client/commands"
+	"github.com/jonipwi/go-chat-client/server_connection"
 	"github.com/jonipwi/go-chat-client/state"
 	"github.com/jonipwi/go-chat-client/utils"
 )
@@ -23,11 +24,11 @@ func main() {
 	clientState := state.NewClientState(username)
 
 	// Start stats reporting
-	go reportStats(clientState)
+	go server_connection.ReportStats(clientState)
 
 	// Connect to the server
 	utils.Logger.Println("STARTUP: Initiating connection to server...")
-	c, err := connectToServer(host, port, clientState)
+	c, err := server_connection.ConnectToServer(host, port, clientState)
 	if err != nil {
 		utils.Logger.Printf("CONNECTION ERROR: Failed on initial connection to server: %v", err)
 		clientState.AddConnectionError(fmt.Sprintf("Initial connection failed: %v", err))
@@ -37,17 +38,20 @@ func main() {
 	}
 
 	// Print available commands
+	fmt.Println("\n=== Welcome to Go Chat Client ===")
+	fmt.Printf("Server: %s:%d\n", host, port)
+	fmt.Printf("Username: %s\n\n", username)
 	commands.PrintCommands()
 
 	// Start heartbeat goroutine to keep connection alive
 	utils.Logger.Println("STARTUP: Starting heartbeat mechanism...")
-	go startHeartbeat(clientState)
+	go server_connection.StartHeartbeat(clientState)
 
 	// Start the command loop
 	utils.Logger.Println("STARTUP: Starting command loop, ready for user input")
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Print("> ")
+		fmt.Print("\n> ")
 		if !scanner.Scan() {
 			utils.Logger.Println("INPUT: Scanner closed")
 			break
@@ -73,7 +77,7 @@ func main() {
 	// Attempt to gracefully close the connection if connected
 	if clientState.IsConnected() && clientState.Client() != nil {
 		utils.Logger.Println("SHUTDOWN: Closing client connection...")
-		clientState.Client().Close()
+		clientState.CloseConnection()
 	}
 
 	utils.Logger.Println("SHUTDOWN: Disconnecting from server...")

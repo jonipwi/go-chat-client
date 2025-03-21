@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/jonipwi/go-chat-client/state"
@@ -29,7 +31,42 @@ func TestHandleGlobalMessage(t *testing.T) {
 	clientState := state.NewClientState("testuser")
 	handleGlobalMessage(clientState, []string{"/global", "Hello World"})
 
-	if clientState.messagesSent != 1 {
+	// Check if message was tracked
+	stats := clientState.GetStats()
+	if !strings.Contains(stats, "Messages Sent: 1") {
 		t.Error("Expected messagesSent to be 1 after sending a global message")
 	}
+}
+
+// TestCommand represents a test command
+type TestCommand struct {
+	Name        string
+	Description string
+}
+
+// NewTestCommand creates a new test command
+func NewTestCommand() *TestCommand {
+	return &TestCommand{
+		Name:        "test",
+		Description: "Test command",
+	}
+}
+
+// Execute executes the test command
+func (c *TestCommand) Execute(clientState *state.ClientState) error {
+	if !checkClientConnected(clientState) {
+		return fmt.Errorf("not connected to server")
+	}
+
+	// Send a test event
+	err := clientState.Client().Emit("test_event", []interface{}{
+		fmt.Sprintf("Test event from %s", clientState.GetUsername()),
+	})
+
+	if err != nil {
+		return fmt.Errorf("error sending test event: %v", err)
+	}
+
+	fmt.Println("Test event sent successfully")
+	return nil
 }
