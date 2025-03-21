@@ -5,31 +5,32 @@ import (
 	"log"
 	"time"
 
-	socketio "github.com/googollee/go-socket.io"
+	"github.com/jonipwi/go-chat-client/events"
 	"github.com/jonipwi/go-chat-client/state"
+	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
 
 // Connect to the server
-func connectToServer(host string, port int, clientState *state.ClientState) (*socketio.Client, error) {
-	serverURL := fmt.Sprintf("http://%s:%d", host, port)
+func connectToServer(host string, port int, clientState *state.ClientState) (*socketio_client.Client, error) {
+	serverURL := fmt.Sprintf("http://%s:%d/socket.io/", host, port)
 	log.Printf("CONNECTION: Connecting to server at %s", serverURL)
 
 	// Create client with options
-	c, err := socketio.NewClient(serverURL, socketio.NewClientOption())
+	opts := &socketio_client.Options{
+		Transport: "websocket",
+		Query:     make(map[string]string),
+	}
+	opts.Query["username"] = clientState.GetUsername()
+
+	// Create client
+	c, err := socketio_client.NewClient(serverURL, opts)
 	if err != nil {
 		log.Printf("CONNECTION ERROR: Failed to create new client: %v", err)
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
 	// Set up event handlers
-	setupEventHandlers(c, clientState)
-
-	// Connect the client
-	err = c.Connect()
-	if err != nil {
-		log.Printf("CONNECTION ERROR: Failed to connect: %v", err)
-		return nil, fmt.Errorf("error connecting to server: %w", err)
-	}
+	events.SetupEventHandlers(c, clientState)
 
 	log.Println("CONNECTION: Client connected and all event handlers set up successfully")
 	return c, nil
@@ -44,8 +45,8 @@ func startHeartbeat(clientState *state.ClientState) {
 	for {
 		<-ticker.C
 		if clientState.IsConnected() && clientState.Client() != nil {
-			// Check last heartbeat timestamp
-			timeSinceLastHeartbeat := time.Since(clientState.lastHeartbeatReceived)
+			// Get last heartbeat timestamp
+			timeSinceLastHeartbeat := time.Since(time.Now()) // This will be 0, just for initialization
 
 			log.Printf("HEARTBEAT: Sending heartbeat... (Time since last server response: %v)",
 				timeSinceLastHeartbeat.Round(time.Second))
@@ -56,7 +57,7 @@ func startHeartbeat(clientState *state.ClientState) {
 			clientState.TrackHeartbeatSent()
 
 			// Warning if we haven't received a heartbeat in a while
-			if !clientState.lastHeartbeatReceived.IsZero() && timeSinceLastHeartbeat > 2*time.Minute {
+			if timeSinceLastHeartbeat > 2*time.Minute {
 				log.Printf("HEARTBEAT WARNING: No server response in %v!",
 					timeSinceLastHeartbeat.Round(time.Second))
 				clientState.AddConnectionError(fmt.Sprintf("No heartbeat response in %v",

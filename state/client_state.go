@@ -5,13 +5,13 @@ import (
 	"sync"
 	"time"
 
-	socketio "github.com/googollee/go-socket.io"
+	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
 
 // ClientState keeps track of the client state
 type ClientState struct {
 	connected             bool
-	client                *socketio.Client
+	client                *socketio_client.Client
 	username              string
 	clientID              string
 	mutex                 sync.Mutex
@@ -26,6 +26,7 @@ type ClientState struct {
 	onConnectHandler      func(string)
 	connectionErrors      []string
 	lastReconnectAttempt  time.Time
+	CurrentRoom           string
 }
 
 // NewClientState creates a new ClientState instance
@@ -48,14 +49,14 @@ func (s *ClientState) IsConnected() bool {
 }
 
 // Client returns the current socket.io client
-func (s *ClientState) Client() *socketio.Client {
+func (s *ClientState) Client() *socketio_client.Client {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return s.client
 }
 
 // SetClient updates the socket.io client
-func (s *ClientState) SetClient(client *socketio.Client) {
+func (s *ClientState) SetClient(client *socketio_client.Client) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.client = client
@@ -199,4 +200,46 @@ func (s *ClientState) GetConnectionErrors() []string {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return append([]string{}, s.connectionErrors...)
+}
+
+// GetClientID returns the current client ID
+func (s *ClientState) GetClientID() string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.clientID
+}
+
+// SetClientID updates the client ID
+func (s *ClientState) SetClientID(clientID string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.clientID = clientID
+}
+
+// GetOnConnectHandler returns the current onConnect handler
+func (s *ClientState) GetOnConnectHandler() func(string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.onConnectHandler
+}
+
+// SetOnConnectHandler updates the onConnect handler
+func (s *ClientState) SetOnConnectHandler(handler func(string)) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.onConnectHandler = handler
+}
+
+// GetCurrentRoom returns the current room
+func (s *ClientState) GetCurrentRoom() string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.CurrentRoom
+}
+
+// SetCurrentRoom updates the current room
+func (s *ClientState) SetCurrentRoom(room string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.CurrentRoom = room
 }

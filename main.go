@@ -32,7 +32,7 @@ func main() {
 		utils.Logger.Printf("CONNECTION ERROR: Failed on initial connection to server: %v", err)
 		clientState.AddConnectionError(fmt.Sprintf("Initial connection failed: %v", err))
 	} else {
-		clientState.Client = c
+		clientState.SetClient(c)
 		utils.Logger.Println("STARTUP: Initial connection established")
 	}
 
