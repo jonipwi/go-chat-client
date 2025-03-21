@@ -270,11 +270,17 @@ func ConnectToServer(host string, port int, clientState *ClientState) (*socketio
 	}
 	opts.Query["username"] = clientState.GetUsername()
 
-	c, err := socketio_client.NewClient(serverURL, opts)
+	client, err := socketio_client.NewClient(serverURL, opts)
 	if err != nil {
-		log.Printf("CONNECTION ERROR: Failed to create new client: %v", err)
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	return c, nil
+	clientState.SetClient(client)
+
+	// Register event handlers here, if needed
+	client.RegisterHandler("message", func(c *socketio_client.Client, msg interface{}) {
+		log.Printf("Received message: %v", msg)
+	})
+
+	return client, nil
 }
