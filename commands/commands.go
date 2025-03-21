@@ -82,3 +82,18 @@ func checkClientConnected(clientState *state.ClientState) bool {
 	}
 	return true
 }
+
+// Handle /exit command for disconnecting
+func handleDisconnect(clientState *state.ClientState) {
+	if clientState.Client() != nil {
+		err := clientState.Client().Close() // Assuming `Close` is the method to disconnect
+		if err != nil {
+			fmt.Printf("Error disconnecting: %v\n", err)
+		} else {
+			clientState.SetConnected(false)
+			fmt.Println("Disconnected from server")
+		}
+	} else {
+		fmt.Println("Client not connected")
+	}
+}
