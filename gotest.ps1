@@ -13,7 +13,7 @@ go clean -modcache
 go mod tidy
 go test
 
-cd ../socketid_client
+cd ../socketio_client
 go clean -modcache
 go mod tidy
 go test

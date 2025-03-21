@@ -3,10 +3,9 @@ package state
 import (
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
-	socketio_client "github.com/zhouhui8915/go-socket.io-client"
+	"github.com/jonipwi/go-chat-client/socketio_client"
 )
 
 // ClientState keeps track of the client state
@@ -15,7 +14,6 @@ type ClientState struct {
 	client                *socketio_client.Client
 	username              string
 	clientID              string
-	mutex                 sync.Mutex
 	lastHeartbeatSent     time.Time
 	lastHeartbeatReceived time.Time
 	lastActivity          time.Time
@@ -24,10 +22,9 @@ type ClientState struct {
 	messagesReceived      int
 	heartbeatsSent        int
 	heartbeatsReceived    int
-	onConnectHandler      func(string)
 	connectionErrors      []string
 	lastReconnectAttempt  time.Time
-	CurrentRoom           string
+	currentRoom           string
 }
 
 // NewClientState creates a new ClientState instance
@@ -43,244 +40,190 @@ func NewClientState(username string) *ClientState {
 // Getters and Setters
 
 // IsConnected returns the current connection status
-func (s *ClientState) IsConnected() bool {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.connected
+func (cs *ClientState) IsConnected() bool {
+	return cs.connected
 }
 
 // Client returns the current socket.io client
-func (s *ClientState) Client() *socketio_client.Client {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.client
+func (cs *ClientState) Client() *socketio_client.Client {
+	return cs.client
 }
 
 // SetClient updates the socket.io client
-func (s *ClientState) SetClient(client *socketio_client.Client) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.client = client
+func (cs *ClientState) SetClient(client *socketio_client.Client) {
+	cs.client = client
 }
 
 // SetConnected updates the connection status
-func (s *ClientState) SetConnected(connected bool) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	wasConnected := s.connected
-	s.connected = connected
+func (cs *ClientState) SetConnected(connected bool) {
+	wasConnected := cs.connected
+	cs.connected = connected
 
 	if connected && !wasConnected {
-		s.connectionStarted = time.Now()
-		fmt.Printf("CONNECTION STATE: Connected at %v\n", s.connectionStarted.Format(time.RFC3339))
+		cs.connectionStarted = time.Now()
+		log.Printf("CONNECTION STATE: Connected at %v\n", cs.connectionStarted.Format(time.RFC3339))
 	} else if !connected && wasConnected {
-		duration := time.Since(s.connectionStarted).Round(time.Second)
-		fmt.Printf("CONNECTION STATE: Disconnected after %v\n", duration)
+		duration := time.Since(cs.connectionStarted).Round(time.Second)
+		log.Printf("CONNECTION STATE: Disconnected after %v\n", duration)
 	}
 }
 
 // UpdateActivity updates the last activity timestamp
-func (s *ClientState) UpdateActivity() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.lastActivity = time.Now()
+func (cs *ClientState) UpdateActivity() {
+	cs.lastActivity = time.Now()
 }
 
 // GetLastActivity returns the last activity timestamp
-func (s *ClientState) GetLastActivity() time.Time {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.lastActivity
+func (cs *ClientState) GetLastActivity() time.Time {
+	return cs.lastActivity
 }
 
 // SetLastReconnectAttempt updates the last reconnect attempt timestamp
-func (s *ClientState) SetLastReconnectAttempt(t time.Time) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.lastReconnectAttempt = t
+func (cs *ClientState) SetLastReconnectAttempt(t time.Time) {
+	cs.lastReconnectAttempt = t
 }
 
 // AddConnectionError adds a new connection error to the history
-func (s *ClientState) AddConnectionError(err string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	// Keep only the last 10 errors
-	if len(s.connectionErrors) >= 10 {
-		s.connectionErrors = s.connectionErrors[1:]
+func (cs *ClientState) AddConnectionError(err string) {
+	if len(cs.connectionErrors) >= 10 {
+		cs.connectionErrors = cs.connectionErrors[1:]
 	}
 
-	s.connectionErrors = append(s.connectionErrors, fmt.Sprintf("[%s] %s",
+	cs.connectionErrors = append(cs.connectionErrors, fmt.Sprintf("[%s] %s",
 		time.Now().Format("15:04:05"), err))
 }
 
 // GetStats returns a formatted string of connection statistics
-func (s *ClientState) GetStats() string {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
+func (cs *ClientState) GetStats() string {
 	var connStatus string
 	var connDuration time.Duration
 
-	if s.connected {
+	if cs.connected {
 		connStatus = "Connected"
-		connDuration = time.Since(s.connectionStarted).Round(time.Second)
+		connDuration = time.Since(cs.connectionStarted).Round(time.Second)
 	} else {
 		connStatus = "Disconnected"
-		if !s.connectionStarted.IsZero() {
-			connDuration = s.lastActivity.Sub(s.connectionStarted).Round(time.Second)
+		if !cs.connectionStarted.IsZero() {
+			connDuration = cs.lastActivity.Sub(cs.connectionStarted).Round(time.Second)
 		}
 	}
 
 	timeSinceLastHeartbeatSent := "Never"
-	if !s.lastHeartbeatSent.IsZero() {
-		timeSinceLastHeartbeatSent = time.Since(s.lastHeartbeatSent).Round(time.Second).String()
+	if !cs.lastHeartbeatSent.IsZero() {
+		timeSinceLastHeartbeatSent = time.Since(cs.lastHeartbeatSent).Round(time.Second).String()
 	}
 
 	timeSinceLastHeartbeatReceived := "Never"
-	if !s.lastHeartbeatReceived.IsZero() {
-		timeSinceLastHeartbeatReceived = time.Since(s.lastHeartbeatReceived).Round(time.Second).String()
+	if !cs.lastHeartbeatReceived.IsZero() {
+		timeSinceLastHeartbeatReceived = time.Since(cs.lastHeartbeatReceived).Round(time.Second).String()
 	}
 
 	// Add reconnection info
 	var reconnInfo string
-	if !s.lastReconnectAttempt.IsZero() {
+	if !cs.lastReconnectAttempt.IsZero() {
 		reconnInfo = fmt.Sprintf(", Last reconnect attempt: %s ago",
-			time.Since(s.lastReconnectAttempt).Round(time.Second))
+			time.Since(cs.lastReconnectAttempt).Round(time.Second))
 	}
 
 	return fmt.Sprintf("Status: %s, Duration: %v, Client ID: %s, Username: %s, "+
 		"Messages Sent: %d, Messages Received: %d, Heartbeats Sent: %d, Heartbeats Received: %d, "+
 		"Time Since Last Heartbeat Sent: %s, Time Since Last Heartbeat Received: %s%s",
-		connStatus, connDuration, s.clientID, s.username,
-		s.messagesSent, s.messagesReceived, s.heartbeatsSent, s.heartbeatsReceived,
+		connStatus, connDuration, cs.clientID, cs.username,
+		cs.messagesSent, cs.messagesReceived, cs.heartbeatsSent, cs.heartbeatsReceived,
 		timeSinceLastHeartbeatSent, timeSinceLastHeartbeatReceived, reconnInfo)
 }
 
 // Message and Heartbeat Tracking Methods
 
 // TrackMessageSent increments the messages sent counter
-func (s *ClientState) TrackMessageSent() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.messagesSent++
-	s.lastActivity = time.Now()
+func (cs *ClientState) TrackMessageSent() {
+	cs.messagesSent++
+	cs.lastActivity = time.Now()
 }
 
 // TrackMessageReceived increments the messages received counter
-func (s *ClientState) TrackMessageReceived() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.messagesReceived++
-	s.lastActivity = time.Now()
+func (cs *ClientState) TrackMessageReceived() {
+	cs.messagesReceived++
+	cs.lastActivity = time.Now()
 }
 
 // TrackHeartbeatSent increments the heartbeats sent counter
-func (s *ClientState) TrackHeartbeatSent() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.heartbeatsSent++
-	s.lastHeartbeatSent = time.Now()
-	s.lastActivity = s.lastHeartbeatSent
+func (cs *ClientState) TrackHeartbeatSent() {
+	cs.heartbeatsSent++
+	cs.lastHeartbeatSent = time.Now()
+	cs.lastActivity = cs.lastHeartbeatSent
 }
 
 // TrackHeartbeatReceived increments the heartbeats received counter
-func (s *ClientState) TrackHeartbeatReceived() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.heartbeatsReceived++
-	s.lastHeartbeatReceived = time.Now()
-	s.lastActivity = s.lastHeartbeatReceived
+func (cs *ClientState) TrackHeartbeatReceived() {
+	cs.heartbeatsReceived++
+	cs.lastHeartbeatReceived = time.Now()
+	cs.lastActivity = cs.lastHeartbeatReceived
 }
 
 // Additional Utility Methods
 
 // GetUsername returns the current username
-func (s *ClientState) GetUsername() string {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.username
+func (cs *ClientState) GetUsername() string {
+	return cs.username
 }
 
 // SetUsername updates the username
-func (s *ClientState) SetUsername(username string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.username = username
+func (cs *ClientState) SetUsername(username string) {
+	cs.username = username
 }
 
 // GetConnectionErrors returns the list of connection errors
-func (s *ClientState) GetConnectionErrors() []string {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return append([]string{}, s.connectionErrors...)
+func (cs *ClientState) GetConnectionErrors() []string {
+	return append([]string{}, cs.connectionErrors...)
 }
 
 // GetClientID returns the current client ID
-func (s *ClientState) GetClientID() string {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.clientID
+func (cs *ClientState) GetClientID() string {
+	return cs.clientID
 }
 
 // SetClientID updates the client ID
-func (s *ClientState) SetClientID(clientID string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.clientID = clientID
-}
-
-// GetOnConnectHandler returns the current onConnect handler
-func (s *ClientState) GetOnConnectHandler() func(string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.onConnectHandler
-}
-
-// SetOnConnectHandler updates the onConnect handler
-func (s *ClientState) SetOnConnectHandler(handler func(string)) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.onConnectHandler = handler
+func (cs *ClientState) SetClientID(clientID string) {
+	cs.clientID = clientID
 }
 
 // GetCurrentRoom returns the current room
-func (s *ClientState) GetCurrentRoom() string {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.CurrentRoom
+func (cs *ClientState) GetCurrentRoom() string {
+	return cs.currentRoom
 }
 
 // SetCurrentRoom updates the current room
-func (s *ClientState) SetCurrentRoom(room string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.CurrentRoom = room
+func (cs *ClientState) SetCurrentRoom(room string) {
+	cs.currentRoom = room
 }
 
-// ConnectToServer connects to the Socket.IO server
-func ConnectToServer(host string, port int, clientState *ClientState) (*socketio_client.Client, error) {
-	serverURL := fmt.Sprintf("http://%s:%d/socket.io/", host, port)
-	log.Printf("CONNECTION: Connecting to server at %s", serverURL)
-
-	opts := &socketio_client.Options{
-		Transport: "websocket",
-		Query:     make(map[string]string),
-	}
-	opts.Query["username"] = clientState.GetUsername()
-
-	client, err := socketio_client.NewClient(serverURL, opts)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %w", err)
-	}
-
-	clientState.SetClient(client)
-
-	// Register event handlers here, if needed
-	client.RegisterHandler("message", func(c *socketio_client.Client, msg interface{}) {
-		log.Printf("Received message: %v", msg)
+// RegisterEventHandlers registers event handlers for the client
+func (cs *ClientState) RegisterEventHandlers() {
+	// Register a handler for the "ping" event
+	cs.client.RegisterHandler("ping", func(client *socketio_client.Client, message interface{}) {
+		log.Println("Received ping message:", message)
 	})
 
-	return client, nil
+	// Register a handler for the "heartbeat" event
+	cs.client.RegisterHandler("heartbeat", func(client *socketio_client.Client, message interface{}) {
+		log.Println("Received heartbeat message:", message)
+	})
+}
+
+// ConnectToServer establishes a connection to the WebSocket server
+func (cs *ClientState) ConnectToServer(serverURL string) error {
+	client, err := socketio_client.NewClient(serverURL, nil)
+	if err != nil {
+		return err
+	}
+
+	cs.client = client
+
+	// Register event handlers after connecting
+	cs.RegisterEventHandlers()
+
+	// Do other client initialization here...
+
+	return nil
 }

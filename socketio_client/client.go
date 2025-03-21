@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"time"
-	"net/http"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -122,4 +122,3 @@ type Options struct {
 	Transport string
 	Query     map[string]string
 }
-
