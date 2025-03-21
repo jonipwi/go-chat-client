@@ -11,7 +11,7 @@ import (
 // ClientState keeps track of the client state
 type ClientState struct {
 	connected             bool
-	client                *socketio.Client // Use fully qualified type
+	client                *socketio.Client
 	username              string
 	clientID              string
 	mutex                 sync.Mutex
@@ -38,20 +38,30 @@ func NewClientState(username string) *ClientState {
 	}
 }
 
-// Getters
+// Getters and Setters
+
+// IsConnected returns the current connection status
 func (s *ClientState) IsConnected() bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return s.connected
 }
 
+// Client returns the current socket.io client
 func (s *ClientState) Client() *socketio.Client {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return s.client
 }
 
-// Set connected state
+// SetClient updates the socket.io client
+func (s *ClientState) SetClient(client *socketio.Client) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.client = client
+}
+
+// SetConnected updates the connection status
 func (s *ClientState) SetConnected(connected bool) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -68,14 +78,14 @@ func (s *ClientState) SetConnected(connected bool) {
 	}
 }
 
-// Update last activity time
+// UpdateActivity updates the last activity timestamp
 func (s *ClientState) UpdateActivity() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.lastActivity = time.Now()
 }
 
-// Add a connection error to the history
+// AddConnectionError adds a new connection error to the history
 func (s *ClientState) AddConnectionError(err string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -89,7 +99,7 @@ func (s *ClientState) AddConnectionError(err string) {
 		time.Now().Format("15:04:05"), err))
 }
 
-// Get connection stats
+// GetStats returns a formatted string of connection statistics
 func (s *ClientState) GetStats() string {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -132,7 +142,9 @@ func (s *ClientState) GetStats() string {
 		timeSinceLastHeartbeatSent, timeSinceLastHeartbeatReceived, reconnInfo)
 }
 
-// Message tracking methods
+// Message and Heartbeat Tracking Methods
+
+// TrackMessageSent increments the messages sent counter
 func (s *ClientState) TrackMessageSent() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -140,6 +152,7 @@ func (s *ClientState) TrackMessageSent() {
 	s.lastActivity = time.Now()
 }
 
+// TrackMessageReceived increments the messages received counter
 func (s *ClientState) TrackMessageReceived() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -147,6 +160,7 @@ func (s *ClientState) TrackMessageReceived() {
 	s.lastActivity = time.Now()
 }
 
+// TrackHeartbeatSent increments the heartbeats sent counter
 func (s *ClientState) TrackHeartbeatSent() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -155,10 +169,34 @@ func (s *ClientState) TrackHeartbeatSent() {
 	s.lastActivity = s.lastHeartbeatSent
 }
 
+// TrackHeartbeatReceived increments the heartbeats received counter
 func (s *ClientState) TrackHeartbeatReceived() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.heartbeatsReceived++
 	s.lastHeartbeatReceived = time.Now()
 	s.lastActivity = s.lastHeartbeatReceived
+}
+
+// Additional Utility Methods
+
+// GetUsername returns the current username
+func (s *ClientState) GetUsername() string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.username
+}
+
+// SetUsername updates the username
+func (s *ClientState) SetUsername(username string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.username = username
+}
+
+// GetConnectionErrors returns the list of connection errors
+func (s *ClientState) GetConnectionErrors() []string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return append([]string{}, s.connectionErrors...)
 }
