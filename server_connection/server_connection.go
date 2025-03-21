@@ -1,3 +1,4 @@
+// server_connection.go
 package server_connection
 
 import (
@@ -5,25 +6,21 @@ import (
 	"log"
 	"time"
 
-	"github.com/jonipwi/go-chat-client/events"
 	"github.com/jonipwi/go-chat-client/state"
-
 	socketio_client "github.com/zhouhui8915/go-socket.io-client"
 )
 
-// Connect to the server
-func connectToServer(host string, port int, clientState *state.ClientState) (*socketio_client.Client, error) {
+// ConnectToServer connects to the server
+func ConnectToServer(host string, port int, clientState *state.ClientState) (*socketio_client.Client, error) {
 	serverURL := fmt.Sprintf("http://%s:%d/socket.io/", host, port)
 	log.Printf("CONNECTION: Connecting to server at %s", serverURL)
 
-	// Create client with options
 	opts := &socketio_client.Options{
 		Transport: "websocket",
 		Query:     make(map[string]string),
 	}
 	opts.Query["username"] = clientState.GetUsername()
 
-	// Create client with retry
 	var c *socketio_client.Client
 	var err error
 	maxRetries := 3
@@ -43,16 +40,13 @@ func connectToServer(host string, port int, clientState *state.ClientState) (*so
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	// Set up event handlers
-	events.SetupEventHandlers(c, clientState)
 	clientState.SetConnected(true)
-
-	log.Println("CONNECTION: Client connected and all event handlers set up successfully")
+	log.Println("CONNECTION: Client connected successfully")
 	return c, nil
 }
 
-// Start a custom heartbeat to keep the connection alive
-func startHeartbeat(clientState *state.ClientState) {
+// StartHeartbeat starts a custom heartbeat mechanism
+func StartHeartbeat(clientState *state.ClientState) {
 	log.Println("HEARTBEAT: Starting custom heartbeat mechanism")
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
@@ -60,14 +54,12 @@ func startHeartbeat(clientState *state.ClientState) {
 	for {
 		<-ticker.C
 		if clientState.IsConnected() && clientState.Client() != nil {
-			// Calculate time since last heartbeat received
 			lastHeartbeat := clientState.GetLastActivity()
 			timeSinceLastHeartbeat := time.Since(lastHeartbeat)
 
 			log.Printf("HEARTBEAT: Sending heartbeat... (Time since last server response: %v)",
 				timeSinceLastHeartbeat.Round(time.Second))
 
-			// Send heartbeat with error handling
 			err := clientState.Client().Emit("client_heartbeat", []interface{}{
 				fmt.Sprintf("Heartbeat from %s at %s",
 					clientState.GetClientID(),
@@ -82,7 +74,6 @@ func startHeartbeat(clientState *state.ClientState) {
 
 			clientState.TrackHeartbeatSent()
 
-			// Warning if we haven't received a heartbeat in a while
 			if timeSinceLastHeartbeat > 2*time.Minute {
 				log.Printf("HEARTBEAT WARNING: No server response in %v!",
 					timeSinceLastHeartbeat.Round(time.Second))
@@ -95,8 +86,8 @@ func startHeartbeat(clientState *state.ClientState) {
 	}
 }
 
-// Report client stats periodically
-func reportStats(clientState *state.ClientState) {
+// ReportStats reports client stats periodically
+func ReportStats(clientState *state.ClientState) {
 	log.Println("STATS: Starting periodic stats reporting")
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
