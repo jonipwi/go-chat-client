@@ -40,7 +40,59 @@ func ConnectToServer(host string, port int, clientState *state.ClientState) (*so
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	clientState.SetConnected(true)
+	// Setup event handlers
+	c.On("connect", func(msg string) {
+		log.Printf("CONNECTION: Connected with client ID: %s", msg)
+		clientState.SetClientID(msg)
+		clientState.SetConnected(true)
+	})
+
+	c.On("disconnect", func() {
+		log.Println("CONNECTION: Disconnected from server")
+		clientState.SetConnected(false)
+	})
+
+	c.On("chat message", func(msg string) {
+		log.Printf("CHAT: %s", msg)
+		clientState.TrackMessageReceived()
+	})
+
+	c.On("message", func(msg string) {
+		log.Printf("SERVER MESSAGE: %s", msg)
+		clientState.TrackMessageReceived()
+	})
+
+	c.On("heartbeat", func(data map[string]interface{}) {
+		log.Printf("HEARTBEAT: Received server heartbeat: %v", data)
+		clientState.TrackHeartbeatReceived()
+	})
+
+	c.On("room joined", func(roomID string) {
+		log.Printf("ROOM: Joined room %s", roomID)
+		clientState.SetCurrentRoom(roomID)
+	})
+
+	c.On("private message", func(sender string, msg string) {
+		log.Printf("PRIVATE: From %s: %s", sender, msg)
+		clientState.TrackMessageReceived()
+	})
+
+	c.On("user joined", func(username string) {
+		log.Printf("ROOM: User %s joined", username)
+	})
+
+	c.On("user left", func(username string) {
+		log.Printf("ROOM: User %s left", username)
+	})
+
+	c.On("typing", func(username string) {
+		log.Printf("TYPING: %s is typing...", username)
+	})
+
+	c.On("stop typing", func(username string) {
+		log.Printf("TYPING: %s stopped typing", username)
+	})
+
 	log.Println("CONNECTION: Client connected successfully")
 	return c, nil
 }
@@ -57,14 +109,22 @@ func StartHeartbeat(clientState *state.ClientState) {
 			lastHeartbeat := clientState.GetLastActivity()
 			timeSinceLastHeartbeat := time.Since(lastHeartbeat)
 
+			// Check if ClientID is set before sending heartbeat
+			clientID := clientState.GetClientID()
+			if clientID == "" {
+				log.Println("HEARTBEAT: Skipping heartbeat - no client ID set yet")
+				continue
+			}
+
 			log.Printf("HEARTBEAT: Sending heartbeat... (Time since last server response: %v)",
 				timeSinceLastHeartbeat.Round(time.Second))
 
-			err := clientState.Client().Emit("client_heartbeat", []interface{}{
-				fmt.Sprintf("Heartbeat from %s at %s",
-					clientState.GetClientID(),
-					time.Now().Format(time.RFC3339)),
-			})
+			// Fixed: Send single string parameter instead of array
+			heartbeatMsg := fmt.Sprintf("Heartbeat from %s at %s",
+				clientID,
+				time.Now().Format(time.RFC3339))
+
+			err := clientState.Client().Emit("client_heartbeat", heartbeatMsg)
 
 			if err != nil {
 				log.Printf("HEARTBEAT ERROR: Failed to send heartbeat: %v", err)
@@ -94,9 +154,7 @@ func ReportStats(clientState *state.ClientState) {
 
 	for {
 		<-ticker.C
-		if clientState.IsConnected() {
-			stats := clientState.GetStats()
-			log.Printf("CLIENT STATS: %s", stats)
-		}
+		stats := clientState.GetStats()
+		log.Printf("CLIENT STATS: %s", stats)
 	}
 }
