@@ -4,7 +4,6 @@ go 1.21
 
 require (
 	github.com/jonipwi/go-chat-client/commands v0.0.0
-	github.com/jonipwi/go-chat-client/events v0.0.0
 	github.com/jonipwi/go-chat-client/state v0.0.0
 	github.com/jonipwi/go-chat-client/utils v0.0.0
 	github.com/zhouhui8915/go-socket.io-client v0.0.0-20200925034401-83ee73793ba4
